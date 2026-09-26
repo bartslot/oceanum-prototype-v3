@@ -78,3 +78,5 @@ typings/
 # Large video files
 public/video/*
 out/
+.vercel
+.env*
