@@ -103,4 +103,6 @@ const Hero = React.memo(() => {
   );
 });
 
+Hero.displayName = "Hero";
+
 export default Hero;
