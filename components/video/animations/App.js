@@ -6,6 +6,7 @@ import gsap from "gsap";
 import CorrectAnswer from "@/components/animatedUI/correct-answer-2";
 import Symbiosis from "@/components/animatedUI/Symbiosis";
 import FishSchool from "@/components/animatedUI/FishSchool";
+import VideoControls from "@/components/video/VideoControls";
 
 const AUTO_CONTINUE_SECONDS = 20;
 const BG_MUSIC_VOLUME = 0.6;
@@ -151,6 +152,13 @@ class App extends Component {
       },
       onComplete: () => this.setState({ bgMusicVolume: BG_MUSIC_VOLUME }),
     });
+  };
+  getVideo = () => {
+    const video = this.player && this.player.getInternalPlayer();
+    return video instanceof HTMLVideoElement ? video : null;
+  };
+  handleControlSeek = (fraction) => {
+    if (this.player) this.player.seekTo(fraction, "fraction");
   };
   bgMusicRef = (player) => {
     this.bgMusic = player;
@@ -571,6 +579,14 @@ class App extends Component {
           </div>
           
           </div> 
+        }
+        {introDone && !questionTime && !answerTime && !ended &&
+          <VideoControls
+            isPlaying={playing}
+            getVideo={this.getVideo}
+            onTogglePlay={this.handlePlayPause}
+            onSeek={this.handleControlSeek}
+          />
         }
         {!introDone &&
         <div id="intro" className="overview fixed inset-0 z-30 overflow-x-hidden overflow-y-auto md:overflow-hidden">
