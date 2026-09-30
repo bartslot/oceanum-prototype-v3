@@ -3,10 +3,8 @@ import { gsap } from "gsap";
 
 // White fish from the correct-answer Lottie, extracted as a looping tail wiggle (drawn facing left).
 const FISH_PATH = "/static/whiteFish.json";
-const FISH_COUNT = 7;
-const FISH_WIDTH = 26;
-// Arc on the ring's right side where the fish emerge, in degrees (0 = straight right).
-const EMERGE_ARC_DEGREES = 70;
+const FISH_COUNT = 9;
+const FISH_WIDTH = 36;
 
 type Props = {
   isSwimming: boolean;
@@ -44,21 +42,29 @@ const FishSchool = ({ isSwimming, originSelector, onDone }: Props) => {
     const centerX = r.left + radius;
     const centerY = r.top + radius;
 
+    // Flock heading: a gathering point on the ring's right side, then one shared wave to the right edge.
+    const gatherX = centerX + radius * 0.5;
+    const flockY = centerY + gsap.utils.random(-60, 60);
+
     const tl = gsap.timeline({ onComplete: onDone });
     fishRefs.current.forEach((el, i) => {
-      const angle = gsap.utils.mapRange(0, FISH_COUNT - 1, -EMERGE_ARC_DEGREES / 2, EMERGE_ARC_DEGREES / 2, i) * (Math.PI / 180);
-      const startX = centerX + Math.cos(angle) * radius;
-      const startY = centerY + Math.sin(angle) * radius;
-      const at = i * 0.09;
+      const angle = gsap.utils.random(0, Math.PI * 2);
+      const distance = radius * gsap.utils.random(0.1, 0.55);
+      const startX = centerX + Math.cos(angle) * distance;
+      const startY = centerY + Math.sin(angle) * distance;
+      const gatherY = centerY + gsap.utils.random(-radius * 0.35, radius * 0.35);
+      const appearAt = i * 0.06;
+      const flockAt = 1.05 + i * 0.06;
 
       // scaleX -1 turns the left-facing fish to the right.
-      gsap.set(el, { x: startX, y: startY, xPercent: -50, yPercent: -50, scaleX: -0.4, scaleY: 0.4, autoAlpha: 0 });
-      tl.to(el, { autoAlpha: 1, scaleX: -1, scaleY: 1, duration: 0.35, ease: "back.out(2)" }, at)
-        // Anticipation: ease back toward the ring before the dash.
-        .to(el, { x: startX - 10, scaleX: -0.88, scaleY: 1.08, duration: 0.3, ease: "power2.out" }, at + 0.35)
-        .to(el, { x: window.innerWidth + FISH_WIDTH * 2, scaleX: -1, scaleY: 1, duration: 1.3, ease: "power2.in" }, at + 0.65)
-        // Wavy path so the school swims rather than slides.
-        .to(el, { y: startY + gsap.utils.random(-40, 40), duration: 0.65, ease: "sine.inOut", yoyo: true, repeat: 1 }, at + 0.65);
+      gsap.set(el, { x: startX, y: startY, xPercent: -50, yPercent: -50, scaleX: -0.2, scaleY: 0.2, autoAlpha: 0 });
+      tl.to(el, { autoAlpha: 1, scaleX: -1, scaleY: 1, duration: 0.35, ease: "back.out(2)" }, appearAt)
+        .to(el, { x: gatherX + gsap.utils.random(-radius * 0.2, radius * 0.2), y: gatherY, duration: 0.5, ease: "power2.inOut" }, appearAt + 0.3)
+        // Anticipation: ease back and squash before the dash.
+        .to(el, { x: "-=10", scaleX: -0.86, scaleY: 1.1, duration: 0.25, ease: "power2.out" }, flockAt - 0.25)
+        .to(el, { x: window.innerWidth + FISH_WIDTH * 2, scaleX: -1, scaleY: 1, duration: 1.4, ease: "power2.in" }, flockAt)
+        // Shared wave with small offsets so they move as one school.
+        .to(el, { y: flockY + (gatherY - centerY) * 0.6, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: 1 }, flockAt);
     });
     return () => {
       tl.kill();

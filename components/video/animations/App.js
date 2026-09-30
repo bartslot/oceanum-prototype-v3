@@ -8,6 +8,8 @@ import Symbiosis from "@/components/animatedUI/Symbiosis";
 import FishSchool from "@/components/animatedUI/FishSchool";
 
 const AUTO_CONTINUE_SECONDS = 20;
+const BG_MUSIC_VOLUME = 0.6;
+const REVEAL_SOUND_FADE_SECONDS = 2.5;
 // Continue button geometry; the SVG stroke traces the button's rounded border.
 const CONTINUE_W = 192;
 const CONTINUE_H = 52;
@@ -44,6 +46,7 @@ class App extends Component {
     pointsAdded: 1,
     started: false,
     introLeaving: false,
+    bgMusicVolume: 0,
     introDone: false,
     ended: false,
     playAudioClip: false,
@@ -95,7 +98,8 @@ class App extends Component {
   startLesson = () => {
     if (this.state.introLeaving || this.isIntroFading) return;
     this.isIntroFading = true;
-    this.setState({ playingBGAudio: true });
+    // Fill the level ring white (same as its hover state) so the white fish emerge out of it.
+    gsap.to("#HOVER", { fillOpacity: 1, duration: 0.5, ease: "power1.out" });
     gsap.to("#introText, #introStart", {
       autoAlpha: 0,
       y: -12,
@@ -105,21 +109,51 @@ class App extends Component {
       onComplete: () => this.setState({ introLeaving: true }),
     });
   };
-  // The slide waits for both the level's fish and the white school to leave.
+  // The reveal waits for both the level's fish and the white school to leave.
   handleSwimOut = () => {
     this.isLevelFishGone = true;
-    this.slideToLesson();
+    this.revealLesson();
   };
   handleSchoolDone = () => {
     this.isSchoolGone = true;
-    this.slideToLesson();
+    this.revealLesson();
   };
-  slideToLesson = () => {
+  // Level fades to white, then a small round mask opens on the full-screen video and grows until it fills the screen.
+  revealLesson = () => {
     if (!this.isLevelFishGone || !this.isSchoolGone) return;
-    this.handleStart(1);
-    gsap.timeline({ onComplete: () => this.setState({ introDone: true }) })
-      .to("#intro", { xPercent: -100, duration: 1, ease: "power3.inOut" })
-      .fromTo(".player-wrapper", { xPercent: 100 }, { xPercent: 0, duration: 1, ease: "power3.inOut", clearProps: "transform" }, 0);
+    gsap.timeline({ onComplete: this.finishReveal })
+      .to("#introWhite", { autoAlpha: 1, duration: 0.6, ease: "power1.inOut" })
+      .add(() => {
+        this.setState({ playingBGAudio: true });
+        this.handleStart(1);
+        this.fadeInSound(REVEAL_SOUND_FADE_SECONDS);
+      })
+      .set(".player-wrapper", { zIndex: 40, clipPath: "circle(0% at 50% 50%)" })
+      .to(".player-wrapper", { clipPath: "circle(5% at 50% 50%)", duration: 0.5, ease: "back.out(2)" })
+      .to(".player-wrapper", { clipPath: "circle(75% at 50% 50%)", duration: 1.6, ease: "power2.in" }, "+=0.2");
+  };
+  finishReveal = () => {
+    gsap.set(".player-wrapper", { clearProps: "zIndex,clipPath" });
+    this.setState({ introDone: true });
+  };
+  // Ramp the video and background music from silent to their normal levels.
+  fadeInSound = (duration) => {
+    const level = { value: 0 };
+    gsap.to(level, {
+      value: 1,
+      duration,
+      ease: "sine.in",
+      onUpdate: () => {
+        const video = this.player && this.player.getInternalPlayer();
+        const music = this.bgMusic && this.bgMusic.getInternalPlayer();
+        if (video && "volume" in video) video.volume = level.value * this.state.volume;
+        if (music && "volume" in music) music.volume = level.value * BG_MUSIC_VOLUME;
+      },
+      onComplete: () => this.setState({ bgMusicVolume: BG_MUSIC_VOLUME }),
+    });
+  };
+  bgMusicRef = (player) => {
+    this.bgMusic = player;
   };
   handlePlayPause = () => {
     this.setState({ playing: !this.state.playing });
@@ -544,6 +578,7 @@ class App extends Component {
             <Symbiosis isLeaving={introLeaving} onSwimOut={this.handleSwimOut} />
           </div>
           <FishSchool isSwimming={introLeaving} originSelector="#HOVER" onDone={this.handleSchoolDone} />
+          <div id="introWhite" className="absolute inset-0 z-20 bg-white invisible pointer-events-none" />
           <div id="introText" className="intro-text relative md:absolute md:right-0 md:top-0 md:h-full w-full md:w-3/5 flex flex-col md:justify-center text-left px-6 md:pl-32 md:pr-16 pointer-events-none">
             <h1 className="text-white text-left font-bold text-5xl">{lessonTitle}</h1>
             <p className="mb-6 mt-3 text-left">
@@ -820,13 +855,13 @@ class App extends Component {
           />
         
         <ReactPlayer
-          ref={this.ref2}
+          ref={this.bgMusicRef}
           url="./audio/symbiosis.mp3"
           playing={playingBGAudio}
           loop={true}
           controls={false}
           className="hidden"
-          volume={0.6}
+          volume={this.state.bgMusicVolume}
         />
         <ReactPlayer
           url="./audio/correct2.mp3"
