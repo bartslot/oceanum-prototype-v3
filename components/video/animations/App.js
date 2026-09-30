@@ -433,7 +433,7 @@ class App extends Component {
               </h2>
               
             {/* Answers */}
-            <div className={`${ this.state.answersReversed ? 'flex-col-reverse md:flex-row-reverse' : 'flex-col md:flex-row' } flex questions gap-8`} >
+            <div className={`${ this.state.answersReversed ? 'flex-col-reverse lg:flex-row-reverse' : 'flex-col lg:flex-row' } flex questions gap-8 w-full max-w-xl lg:max-w-none lg:w-auto px-4`} >
               {q0 && <button className='question link' onClick={() => this.answerQuestion(true)}>{q0}</button> }
               {q1 && <button className='question link' onClick={() => this.answerQuestion(false)}>{q1}</button> }
               {q2 && <button className='question link' onClick={() => this.answerQuestion(false)}>{q2}</button> }

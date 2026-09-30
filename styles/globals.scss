@@ -215,7 +215,7 @@ button {
   // }
 }
 .question {
-  @apply transition-transform ease-out hover:-translate-y-0.5 py-2 px-7 font-medium border-2 border-white rounded-md text-base w-fit md:text-xl tracking-wide duration-300 z-50;
+  @apply transition-transform ease-out hover:-translate-y-0.5 py-2 px-7 font-medium border-2 border-white rounded-md text-base w-full lg:w-fit md:text-xl tracking-wide duration-300 z-50;
 }
 .progress {
   height: 0.1875rem;
@@ -236,8 +236,9 @@ button {
     left: -50vw;
     position: fixed;
   }
+  // Enlarge with real size, not transform: scale, which overlapped stacked buttons.
   button {
-    transform: scale(1.4);
+    @apply text-2xl py-3;
     width: 60vw;
   }
   p {
