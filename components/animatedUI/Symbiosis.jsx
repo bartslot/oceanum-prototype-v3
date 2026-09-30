@@ -1,11 +1,16 @@
-import React from "react";
+import React, { useEffect } from "react";
 import gsap from "gsap";
 
 const Symbiosis = (props) => {
-  var tl = gsap.timeline({repeat: -1});
-  tl.repeat(-1).yoyo(true).play();
-  tl.fromTo('.Fish2', { x: 20, y:20, rotate:0 }, {x: -20, y:20, rotate:12, duration: 1,  stagger: 2 });
-  tl.fromTo('#Fish1', { x: 20, y:20, rotate:0 }, {x: -20, y:20, rotate:-12, duration: 1 });
+  // Build the swim loop once per mount; creating it in render stacked a new infinite timeline on every re-render.
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({ repeat: -1, yoyo: true, defaults: { ease: "sine.inOut", force3D: true } });
+      tl.fromTo('.Fish2', { x: 20, y: 20, rotate: 0 }, { x: -20, y: 20, rotate: 12, duration: 1.4, stagger: 2 });
+      tl.fromTo('#Fish1', { x: 20, y: 20, rotate: 0 }, { x: -20, y: 20, rotate: -12, duration: 1.4 });
+    });
+    return () => ctx.revert();
+  }, []);
 
   return (
     <svg
@@ -2923,4 +2928,4 @@ const Symbiosis = (props) => {
   );
 };
 
-export default Symbiosis;
+export default React.memo(Symbiosis);

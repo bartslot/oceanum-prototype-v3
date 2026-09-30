@@ -191,6 +191,7 @@ button {
       background-size: 200% 100%;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      transition: background-position 0.4s ease;
     }
     button.link:hover {
       background-position: 100% 0%;
@@ -198,8 +199,8 @@ button {
 }
 @supports not (-webkit-background-clip: text) { 
   button.link {
-    @apply text-white;
-    button.link:hover {
+    @apply text-white transition-colors;
+    &:hover {
       @apply text-blue-300;
     }
   }
@@ -214,7 +215,7 @@ button {
   // }
 }
 .question {
-  @apply py-2 px-7 font-medium border-2 border-white rounded-md text-base w-fit md:text-xl tracking-wide duration-300 z-50;
+  @apply transition-transform ease-out hover:-translate-y-0.5 py-2 px-7 font-medium border-2 border-white rounded-md text-base w-fit md:text-xl tracking-wide duration-300 z-50;
 }
 .progress {
   height: 0.1875rem;

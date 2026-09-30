@@ -12,7 +12,7 @@
     "firebase": "^9.6.2",
     "firebase-tools": "^10.0.1",
     "global": "^4.4.0",
-    "gsap": "3.8.0",
+    "gsap": "^3.12.5",
     "lottie-react": "^2.2.1",
     "lottie-web": "^5.8.1",
     "next": "^12.3.4",

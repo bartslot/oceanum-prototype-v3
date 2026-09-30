@@ -199,7 +199,6 @@ class App extends Component {
     this.state.playedSeconds;
   };
   handleProgress = (state, handle) => {
-    console.log("onProgress", state);
     // We only want to update time slider if we are not currently seeking
     if (!this.state.seeking) {
       this.setState(state);
@@ -222,13 +221,7 @@ class App extends Component {
   };
   questionTime = (timeAmount) => {
     this.handleToggleQuestionTime();
-    gsap.set("#questionTime", {opacity: 0})
-    gsap.fromTo(".questionType", { autoAlpha: 0 }, { autoAlpha: 1, duration: 1 });
-    gsap.fromTo("#questionTime", { autoAlpha: 0 }, { autoAlpha: 1, duration: 1 });
-    gsap.fromTo( "#questionTitle", { opacity: 0 }, { opacity: 1, duration: 1 }, "+=.3");
-    gsap.fromTo(".questions",{ autoAlpha: 0 },{ autoAlpha: 1, duration: 1},">.1");
-    gsap.fromTo(".question",{ autoAlpha: 0 },{ autoAlpha: 1, duration: 1},">.5");
-    
+
     // Pick answer order once per question; randomizing in render reshuffled the buttons on every re-render.
     this.setState({ question: this.state.question + 1, answersReversed: Math.random() < 0.5 });
 
@@ -294,6 +287,16 @@ class App extends Component {
           q0: "The clownfish is immune to the poison",
         });
     }
+    // Runs after the switch so the tweens target this question's rendered title/answers
+    // (setState is synchronous here: onProgress fires outside React's event batching).
+    this.animateQuestionIn();
+  };
+  animateQuestionIn = () => {
+    gsap.timeline({ defaults: { ease: "power2.out" } })
+      .fromTo("#questionTime", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6 })
+      .fromTo(".questionType", { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: 0.6 }, "-=0.3")
+      .fromTo("#questionTitle", { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.7 }, "-=0.35")
+      .fromTo(".question", { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.5, stagger: 0.12, clearProps: "transform" }, "-=0.3");
   };
   
   // Set every flag explicitly: toggles drifted out of sync after a wrong answer.
@@ -306,10 +309,17 @@ class App extends Component {
       playingCorrectAudio: isCorrect,
       playingInCorrectAudio: !isCorrect,
       points: this.state.points + (isCorrect ? this.state.pointsAdded : 0),
-    });
+    }, this.animateFeedbackIn);
     gsap.delayedCall(isCorrect ? CORRECT_FEEDBACK_SECONDS : INCORRECT_FEEDBACK_SECONDS, this.finishAnswer);
   };
+  animateFeedbackIn = () => {
+    gsap.fromTo("#correct, #incorrect", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.8, delay: 0.15, ease: "power3.out" });
+  };
+  // Fade the overlay out first so the video is revealed smoothly instead of the overlay vanishing.
   finishAnswer = () => {
+    gsap.to("#questionAnswer", { autoAlpha: 0, duration: 0.5, ease: "power2.in", onComplete: this.resetAnswer });
+  };
+  resetAnswer = () => {
     this.setState({
       answerTime: false,
       correctQuestion: false,
