@@ -42,7 +42,8 @@ class App extends Component {
     points: 0,
     pointsAdded: 1,
     started: false,
-    overview: false,
+    introLeaving: false,
+    introDone: false,
     ended: false,
     playAudioClip: false,
     qTime1: 32, //32
@@ -89,14 +90,25 @@ class App extends Component {
     this.setState({ playing: true, started: true });
     this.load(url);
   };
-  triggerOverview = () => {
-    gsap.fromTo(".overview", { autoAlpha: 1 }, { autoAlpha: 0, duration: 1 });
+  // Intro exit: fade the text, let the fish swim out (Symbiosis calls handleSwimOut), then slide to the video.
+  startLesson = () => {
+    if (this.state.introLeaving || this.isIntroFading) return;
+    this.isIntroFading = true;
     this.setState({ playingBGAudio: true });
-    this.handleOverview();
-  }
-  handleOverview = () => {
-    console.log('handle overview');
-    this.setState({ overview: !this.state.overview});
+    gsap.to("#introText, #introStart", {
+      autoAlpha: 0,
+      y: -12,
+      duration: 0.5,
+      ease: "power2.in",
+      stagger: 0.05,
+      onComplete: () => this.setState({ introLeaving: true }),
+    });
+  };
+  handleSwimOut = () => {
+    this.handleStart(1);
+    gsap.timeline({ onComplete: () => this.setState({ introDone: true }) })
+      .to("#intro", { xPercent: -100, duration: 1, ease: "power3.inOut" })
+      .fromTo(".player-wrapper", { xPercent: 100 }, { xPercent: 0, duration: 1, ease: "power3.inOut", clearProps: "transform" }, 0);
   };
   handlePlayPause = () => {
     this.setState({ playing: !this.state.playing });
@@ -421,7 +433,8 @@ class App extends Component {
       q4,
       q5,
       started,
-      overview,
+      introLeaving,
+      introDone,
     } = this.state;
     const SEPARATOR = " · ";
 
@@ -514,44 +527,37 @@ class App extends Component {
           
           </div> 
         }
-        {!overview && 
-        <div className="w-screen flex items-center justify-center text-left h-screen relative">
-          <div>
-            <h1 className={`text-white text-left font-bold text-5xl z-50`}>{lessonTitle}</h1>
-            <p className={`mb-6 mt-3 text-left`}>
+        {!introDone &&
+        <div id="intro" className="overview fixed inset-0 z-30 overflow-x-hidden overflow-y-auto md:overflow-hidden">
+          <div className="link cursor-pointer" onClick={this.startLesson}>
+            <Symbiosis isLeaving={introLeaving} onSwimOut={this.handleSwimOut} />
+          </div>
+          <div id="introText" className="intro-text relative md:absolute md:right-0 md:top-0 md:h-full w-full md:w-3/5 flex flex-col md:justify-center text-left px-6 md:pl-32 md:pr-16 pointer-events-none">
+            <h1 className="text-white text-left font-bold text-5xl">{lessonTitle}</h1>
+            <p className="mb-6 mt-3 text-left">
               Symbiosis is the connection between different species.
-              </p>
-              <h3 className="my-5 text-3xl font-medium">
-              Different types of symbiosis are </h3>
-              <p>
-              <strong>Commensalism</strong> (One benefits and the other derives neither benefit nor harm), <br /> 
-              <strong>Parasitism</strong> (One benefits at the expense of the other), <br /> 
-              <strong>Mutualism</strong> (Where all species involved benefit from their interactions), <br /> 
+            </p>
+            <h3 className="my-5 text-3xl font-medium">Different types of symbiosis are</h3>
+            <p>
+              <strong>Commensalism</strong> (One benefits and the other derives neither benefit nor harm), <br />
+              <strong>Parasitism</strong> (One benefits at the expense of the other), <br />
+              <strong>Mutualism</strong> (Where all species involved benefit from their interactions), <br />
               <br />
               In this small quiz a team of Clownfish will have to work together
               with a Sea Anemone for their survival.
               <br />
               The questions will test your knowledge &amp; <strong>intuïtion</strong>. It&apos;s ok if you don&apos;t know the answer. You&apos;ll get it next time.
             </p>
-          <div className={`mt-20 flex-1`}>
-            <a onClick={() => this.triggerOverview()} className="link">
-              <button
-                className="py-2 px-7 font-medium border-2 uppercase border-white bg-white rounded-md text-base text-black
-              md:text-xl tracking-wide duration-300 z-50 link"
-                onClick={() => this.triggerOverview()}
-              >
-                Start
-              </button>
-            </a>
           </div>
+          <div id="introStart" className="relative md:absolute md:bottom-10 md:left-0 md:right-0 flex justify-center py-10 md:py-0">
+            <button
+              type="button"
+              className="w-48 py-2 font-medium border-2 uppercase border-white rounded-md text-base md:text-xl tracking-wide link"
+              onClick={this.startLesson}
+            >
+              Start
+            </button>
           </div>
-        </div>
-        }
-        {!started && overview && 
-        <div className="overview w-screen h-screen relative">
-          <a onClick={() => this.handleStart(1)} >
-            <Symbiosis className="lessonCard absolute left-0 top-40" />
-          </a>
         </div>
         }
         {ended && 

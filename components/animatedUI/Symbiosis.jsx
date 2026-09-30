@@ -1,16 +1,87 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import gsap from "gsap";
 
-const Symbiosis = (props) => {
-  // Build the swim loop once per mount; creating it in render stacked a new infinite timeline on every re-render.
+const VIEWBOX_WIDTH = 580;
+const SWIMMERS = "#Fish1, #Fish3, .Fish2, #Clownfish";
+// These fish are drawn facing left, so they turn around before swimming right.
+const FACING_LEFT = "#Fish1, .Fish2";
+const isClownfish = (el) => el.id === "Clownfish";
+const TENTACLES = "#SeaAnemone > path";
+const TENTACLE_SWAY_SECONDS = 2.4;
+
+// Sway each tentacle from its base; delay by x so a current ripples across the anemone.
+const swayTentacles = (tentacles) => {
+  const lefts = tentacles.map((el) => el.getBoundingClientRect().left);
+  const minLeft = Math.min(...lefts);
+  const span = Math.max(...lefts) - minLeft || 1;
+  tentacles.forEach((el, i) => {
+    gsap.fromTo(el,
+      { skewX: -3, rotate: -2 },
+      {
+        skewX: 3,
+        rotate: 2,
+        duration: TENTACLE_SWAY_SECONDS * gsap.utils.random(0.85, 1.15),
+        ease: "sine.inOut",
+        transformOrigin: "50% 100%",
+        repeat: -1,
+        yoyo: true,
+        delay: ((lefts[i] - minLeft) / span) * TENTACLE_SWAY_SECONDS,
+      });
+  });
+};
+
+// Drift to a nearby random spot, then pick another one: reads as idle swimming, not a fixed loop.
+const wander = (el) => {
+  const range = isClownfish(el) ? 6 : 14;
+  gsap.to(el, {
+    x: gsap.utils.random(-range, range),
+    y: gsap.utils.random(-range / 2, range / 2),
+    rotate: gsap.utils.random(-5, 5),
+    duration: gsap.utils.random(1.6, 3),
+    ease: "sine.inOut",
+    transformOrigin: "50% 50%",
+    onComplete: () => wander(el),
+  });
+};
+
+const Symbiosis = ({ isLeaving = false, onSwimOut }) => {
+  const svgRef = useRef(null);
+
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ repeat: -1, yoyo: true, defaults: { ease: "sine.inOut", force3D: true } });
-      tl.fromTo('.Fish2', { x: 20, y: 20, rotate: 0 }, { x: -20, y: 20, rotate: 12, duration: 1.4, stagger: 2 });
-      tl.fromTo('#Fish1', { x: 20, y: 20, rotate: 0 }, { x: -20, y: 20, rotate: -12, duration: 1.4 });
-    });
-    return () => ctx.revert();
+    const fish = svgRef.current.querySelectorAll(SWIMMERS);
+    const tentacles = [...svgRef.current.querySelectorAll(TENTACLES)];
+    fish.forEach((el) => gsap.delayedCall(gsap.utils.random(0, 1), wander, [el]));
+    swayTentacles(tentacles);
+    return () => {
+      gsap.killTweensOf(fish);
+      gsap.killTweensOf(tentacles);
+      gsap.killTweensOf(wander);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!isLeaving) return;
+    const svg = svgRef.current;
+    const fish = svg.querySelectorAll(SWIMMERS);
+    gsap.killTweensOf(fish);
+    gsap.killTweensOf(wander);
+
+    // Distance to just past the right edge of the viewport, in SVG units.
+    const scale = svg.getBoundingClientRect().width / VIEWBOX_WIDTH;
+    const offscreenX = (el) => (window.innerWidth - el.getBoundingClientRect().left) / scale + 40;
+
+    const tl = gsap.timeline({ onComplete: onSwimOut });
+    tl.to(svg.querySelectorAll(FACING_LEFT), { scaleX: -1, rotate: 0, duration: 0.3, ease: "power2.inOut", transformOrigin: "50% 50%" })
+      .to(fish, {
+        x: (i, el) => gsap.getProperty(el, "x") + offscreenX(el),
+        y: () => gsap.utils.random(-30, 30),
+        rotate: 0,
+        duration: 1.4,
+        ease: "power2.in",
+        stagger: 0.08,
+      }, 0.1);
+    return () => tl.kill();
+  }, [isLeaving, onSwimOut]);
 
   return (
     <svg
@@ -20,6 +91,8 @@ const Symbiosis = (props) => {
       viewBox="0 0 580 473"
       xmlns="http://www.w3.org/2000/svg"
       id="SymbiosisSVG"
+      ref={svgRef}
+      style={{ overflow: "visible", maxWidth: "100vw", height: "auto" }}
     >
       <title>Symbiosis</title>
       <defs>

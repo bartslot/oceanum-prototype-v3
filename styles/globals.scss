@@ -286,10 +286,32 @@ p {
   transition: fill-opacity 1s;
   transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
+// Level card at 60% of its drawn size (580x473).
 #SymbiosisSVG {
   top: 50%;
+  left: 6vw;
   position: absolute;
-  transform: translateY(-250px)
+  width: 348px;
+  height: auto;
+  transform: translateY(-50%);
+}
+// Phones: stack level card, text and Start in one scrolling column.
+@media screen and (max-width: 767px) {
+  #intro #SymbiosisSVG {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    display: block;
+    margin: 5rem auto 0;
+    width: 60vw;
+  }
+}
+// Desktop: darken the ocean behind the intro text so it stays readable over the level screen.
+@media screen and (min-width: 768px) {
+  .intro-text {
+    background: linear-gradient(to left, rgba(9, 13, 24, 0.95) 80%, rgba(9, 13, 24, 0));
+  }
 }
 #PlayButton {
   @apply shadow-sm;
