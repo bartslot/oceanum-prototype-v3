@@ -3,11 +3,12 @@ import gsap from "gsap";
 
 const VIEWBOX_WIDTH = 580;
 const SWIMMERS = "#Fish1, #Fish3, .Fish2, #Clownfish";
-// These fish are drawn facing left, so they turn around before swimming right.
-const FACING_LEFT = "#Fish1, .Fish2";
-const isClownfish = (el) => el.id === "Clownfish";
 const TENTACLES = "#SeaAnemone > path";
 const TENTACLE_SWAY_SECONDS = 2.4;
+
+const isClownfish = (el) => el.id === "Clownfish";
+// #Fish1 and .Fish2 are drawn facing left; the rest face right.
+const headingOf = (el) => (el.id === "Fish1" || el.classList.contains("Fish2") ? -1 : 1);
 
 // Sway each tentacle from its base; delay by x so a current ripples across the anemone.
 const swayTentacles = (tentacles) => {
@@ -30,56 +31,59 @@ const swayTentacles = (tentacles) => {
   });
 };
 
-// Drift to a nearby random spot, then pick another one: reads as idle swimming, not a fixed loop.
-const wander = (el) => {
-  const range = isClownfish(el) ? 6 : 14;
-  gsap.to(el, {
-    x: gsap.utils.random(-range, range),
-    y: gsap.utils.random(-range / 2, range / 2),
-    rotate: gsap.utils.random(-5, 5),
-    duration: gsap.utils.random(1.6, 3),
-    ease: "sine.inOut",
-    transformOrigin: "50% 50%",
-    onComplete: () => wander(el),
-  });
+// Idle: a gentle bob and tilt, plus a forward dart every few seconds.
+// The dart winds up first (ease back, squash), bursts forward, then glides home.
+const swimIdle = (el) => {
+  const heading = headingOf(el);
+  const dart = isClownfish(el) ? 8 : 18;
+  gsap.set(el, { transformOrigin: "50% 50%" });
+  gsap.to(el, { y: gsap.utils.random(3, 6), duration: gsap.utils.random(1.4, 2), ease: "sine.inOut", repeat: -1, yoyo: true });
+  gsap.fromTo(el, { rotate: -2 }, { rotate: 2, duration: gsap.utils.random(0.9, 1.3), ease: "sine.inOut", repeat: -1, yoyo: true });
+  gsap.timeline({ repeat: -1, repeatDelay: gsap.utils.random(1.5, 3.5), delay: gsap.utils.random(0, 2.5) })
+    .to(el, { x: -heading * dart * 0.3, scaleX: 0.9, scaleY: 1.06, duration: 0.35, ease: "power2.out" })
+    .to(el, { x: heading * dart, scaleX: 1.04, scaleY: 0.97, duration: 0.3, ease: "power3.out" })
+    .to(el, { scaleX: 1, scaleY: 1, duration: 0.3, ease: "power1.out" }, "<0.2")
+    .to(el, { x: 0, duration: 2.2, ease: "sine.inOut" });
+};
+
+// Leave: turn to face right, wind up, then burst off-screen with a quick body wiggle.
+const swimOut = (el, offscreenX, delay) => {
+  const turn = headingOf(el) === -1;
+  const tl = gsap.timeline({ delay });
+  if (turn) tl.to(el, { scaleX: -1, duration: 0.25, ease: "power2.inOut" });
+  const facing = turn ? -1 : 1;
+  tl.to(el, { x: `-=${12}`, scaleX: 0.85 * facing, scaleY: 1.1, rotate: 0, duration: 0.3, ease: "power2.out" })
+    .to(el, { x: `+=${offscreenX}`, scaleX: 1.05 * facing, scaleY: 0.95, duration: 1.1, ease: "power2.in" })
+    .fromTo(el, { rotate: -6 }, { rotate: 6, duration: 0.09, ease: "sine.inOut", repeat: 11, yoyo: true }, "<");
+  return tl;
 };
 
 const Symbiosis = ({ isLeaving = false, onSwimOut }) => {
   const svgRef = useRef(null);
 
   useEffect(() => {
-    const fish = svgRef.current.querySelectorAll(SWIMMERS);
+    const fish = [...svgRef.current.querySelectorAll(SWIMMERS)];
     const tentacles = [...svgRef.current.querySelectorAll(TENTACLES)];
-    fish.forEach((el) => gsap.delayedCall(gsap.utils.random(0, 1), wander, [el]));
+    fish.forEach(swimIdle);
     swayTentacles(tentacles);
     return () => {
       gsap.killTweensOf(fish);
       gsap.killTweensOf(tentacles);
-      gsap.killTweensOf(wander);
     };
   }, []);
 
   useEffect(() => {
     if (!isLeaving) return;
     const svg = svgRef.current;
-    const fish = svg.querySelectorAll(SWIMMERS);
+    const fish = [...svg.querySelectorAll(SWIMMERS)];
     gsap.killTweensOf(fish);
-    gsap.killTweensOf(wander);
 
     // Distance to just past the right edge of the viewport, in SVG units.
     const scale = svg.getBoundingClientRect().width / VIEWBOX_WIDTH;
-    const offscreenX = (el) => (window.innerWidth - el.getBoundingClientRect().left) / scale + 40;
+    const offscreenX = (el) => (window.innerWidth - el.getBoundingClientRect().left) / scale + 60;
 
     const tl = gsap.timeline({ onComplete: onSwimOut });
-    tl.to(svg.querySelectorAll(FACING_LEFT), { scaleX: -1, rotate: 0, duration: 0.3, ease: "power2.inOut", transformOrigin: "50% 50%" })
-      .to(fish, {
-        x: (i, el) => gsap.getProperty(el, "x") + offscreenX(el),
-        y: () => gsap.utils.random(-30, 30),
-        rotate: 0,
-        duration: 1.4,
-        ease: "power2.in",
-        stagger: 0.08,
-      }, 0.1);
+    fish.forEach((el, i) => tl.add(swimOut(el, offscreenX(el), i * 0.08), 0));
     return () => tl.kill();
   }, [isLeaving, onSwimOut]);
 

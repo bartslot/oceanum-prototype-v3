@@ -5,6 +5,7 @@ import Duration from "./Duration";
 import gsap from "gsap";
 import CorrectAnswer from "@/components/animatedUI/correct-answer-2";
 import Symbiosis from "@/components/animatedUI/Symbiosis";
+import FishSchool from "@/components/animatedUI/FishSchool";
 
 const AUTO_CONTINUE_SECONDS = 20;
 // Continue button geometry; the SVG stroke traces the button's rounded border.
@@ -104,7 +105,17 @@ class App extends Component {
       onComplete: () => this.setState({ introLeaving: true }),
     });
   };
+  // The slide waits for both the level's fish and the white school to leave.
   handleSwimOut = () => {
+    this.isLevelFishGone = true;
+    this.slideToLesson();
+  };
+  handleSchoolDone = () => {
+    this.isSchoolGone = true;
+    this.slideToLesson();
+  };
+  slideToLesson = () => {
+    if (!this.isLevelFishGone || !this.isSchoolGone) return;
     this.handleStart(1);
     gsap.timeline({ onComplete: () => this.setState({ introDone: true }) })
       .to("#intro", { xPercent: -100, duration: 1, ease: "power3.inOut" })
@@ -532,6 +543,7 @@ class App extends Component {
           <div className="link cursor-pointer" onClick={this.startLesson}>
             <Symbiosis isLeaving={introLeaving} onSwimOut={this.handleSwimOut} />
           </div>
+          <FishSchool isSwimming={introLeaving} originSelector="#HOVER" onDone={this.handleSchoolDone} />
           <div id="introText" className="intro-text relative md:absolute md:right-0 md:top-0 md:h-full w-full md:w-3/5 flex flex-col md:justify-center text-left px-6 md:pl-32 md:pr-16 pointer-events-none">
             <h1 className="text-white text-left font-bold text-5xl">{lessonTitle}</h1>
             <p className="mb-6 mt-3 text-left">
