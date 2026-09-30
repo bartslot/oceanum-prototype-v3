@@ -75,8 +75,6 @@ typings/
 # FuseBox cache
 .fusebox/
 
-# Large video files
-public/video/*
 out/
 .vercel
 .env*

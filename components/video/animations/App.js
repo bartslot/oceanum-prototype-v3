@@ -6,6 +6,9 @@ import gsap from "gsap";
 import CorrectAnswer from "@/components/animatedUI/correct-answer-2";
 import Symbiosis from "@/components/animatedUI/Symbiosis";
 
+const CORRECT_FEEDBACK_SECONDS = 8;
+const INCORRECT_FEEDBACK_SECONDS = 12;
+
 class App extends Component {
   constructor(props) {
       super(props);
@@ -226,7 +229,8 @@ class App extends Component {
     gsap.fromTo(".questions",{ autoAlpha: 0 },{ autoAlpha: 1, duration: 1},">.1");
     gsap.fromTo(".question",{ autoAlpha: 0 },{ autoAlpha: 1, duration: 1},">.5");
     
-    this.setState({ question: this.state.question + 1 });
+    // Pick answer order once per question; randomizing in render reshuffled the buttons on every re-render.
+    this.setState({ question: this.state.question + 1, answersReversed: Math.random() < 0.5 });
 
     this.handlePlayPause();
     // this.handleToggleMuted()
@@ -257,8 +261,8 @@ class App extends Component {
           qInfo: 1,
           qFeedback: "Oh crab! Its a perfect home for something else...",
           questionTitle: "Is the shell suitable to lay the eggs?",
-          q0: "Yes",
-          q1: "No",
+          q0: "No",
+          q1: "Yes",
         });
         break;
       case 4:
@@ -267,8 +271,8 @@ class App extends Component {
           qFeedback:
             "Over 300 million tonnes of plastic are produced each year, and eight million tonnes of that ends up clogging our oceans.",
           questionTitle: "Is the plastic bottle suitable?",
-          q0: "Yes",
-          q1: "No",
+          q0: "No",
+          q1: "Yes",
         });
         break;
       case 5:
@@ -292,50 +296,29 @@ class App extends Component {
     }
   };
   
-  answerQuestion = (q) => {
-    // gsap.set("#questionTime", {opacity: 0})
-    this.handleToggleAnswerTime()
-    this.handleToggleQuestionTime()
-    console.log("Answertime:" + this.state.answerTime)
-    console.log(this.state.answerTime)
-    // gsap.to("#question", { opacity: 0, scale: 1.1, duration: 1 })
-    // this.handleToggleMuted()
-    if (!q) { // Not correct answer
-      this.handleToggleInCorrectQuestion()
-      this.handleTogglePlayInCorrectAudio()
-      gsap.set("#incorrect", {  opacity: 0 })
-      // gsap.fromTo('.feedback', { opacity: 0, scale: .3, x: -100}, { duration: 1, scale: 1, x: 100})
-      gsap.to("#incorrect", { opacity: 1, duration: 2, delay: 1})
-      gsap.to("#incorrect", { opacity: 0, duration: 1, delay: 12 })
-      gsap.set("#incorrect", { visibility: "hidden", delay: 12 })
-
-      this.isThisbeingCalled()
-      gsap.delayedCall(12, this.handlePlayPause, [])
-      gsap.delayedCall(12, this.handleToggleAnswerTime, [])
-      gsap.delayedCall(12, this.handleToggleCorrectQuestion, [])
-      // this.handleToggleCorrectQuestion()
-      
-    } else { // Correct Answer
-      this.handleToggleCorrectQuestion()
-      this.setState({ points: this.state.points + this.state.pointsAdded }) //Add points
-      this.handleTogglePlayCorrectAudio()
-      gsap.set("#correct", { visibility: "visible", opacity: 0 })
-      gsap.to("#correct", { opacity: 1, duration: 2, delay: 1 })
-      gsap.to("#correct", { opacity: 0, duration: 1, delay: 8 })
-      gsap.set("#correct", { visibility: "hidden", delay: 8 })
-      
-      this.isThisbeingCalled()
-      gsap.delayedCall(8, this.handlePlayPause, [])
-      gsap.delayedCall(8, this.handleToggleAnswerTime, [])
-      gsap.delayedCall(8, this.handleToggleCorrectQuestion, [])
-      // this.handleToggleCorrectQuestion()
-     
-    }
-    
+  // Set every flag explicitly: toggles drifted out of sync after a wrong answer.
+  answerQuestion = (isCorrect) => {
+    this.setState({
+      questionTime: false,
+      answerTime: true,
+      correctQuestion: isCorrect,
+      inCorrectQuestion: !isCorrect,
+      playingCorrectAudio: isCorrect,
+      playingInCorrectAudio: !isCorrect,
+      points: this.state.points + (isCorrect ? this.state.pointsAdded : 0),
+    });
+    gsap.delayedCall(isCorrect ? CORRECT_FEEDBACK_SECONDS : INCORRECT_FEEDBACK_SECONDS, this.finishAnswer);
   };
-  isThisbeingCalled = () => {
-    console.log('CALLED')
-  }
+  finishAnswer = () => {
+    this.setState({
+      answerTime: false,
+      correctQuestion: false,
+      inCorrectQuestion: false,
+      playingCorrectAudio: false,
+      playingInCorrectAudio: false,
+      playing: true,
+    });
+  };
   continueStory = (correct) => {
     
     gsap.killTweensOf(this.answerQuestion())
@@ -440,7 +423,7 @@ class App extends Component {
               </h2>
               
             {/* Answers */}
-            <div className={`${ Math.floor(Math.random() * 2) == 1 ? 'flex-col-reverse md:flex-row-reverse' : 'flex-col md:flex-row' } flex questions gap-8`} >
+            <div className={`${ this.state.answersReversed ? 'flex-col-reverse md:flex-row-reverse' : 'flex-col md:flex-row' } flex questions gap-8`} >
               {q0 && <button className='question link' onClick={() => this.answerQuestion(true)}>{q0}</button> }
               {q1 && <button className='question link' onClick={() => this.answerQuestion(false)}>{q1}</button> }
               {q2 && <button className='question link' onClick={() => this.answerQuestion(false)}>{q2}</button> }
