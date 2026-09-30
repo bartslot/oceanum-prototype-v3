@@ -31,44 +31,108 @@ const swayTentacles = (tentacles) => {
   });
 };
 
-// Idle: a gentle bob and tilt, plus a forward dart every few seconds.
-// The dart winds up first (ease back, squash), bursts forward, then glides home.
+// The fish art is flat lists of paths, so tails and fins are found by position / child index.
+const TAIL_REAR_FRACTION = 0.2;
+const FIN_CHILD_INDEXES = { Clownfish: [3, 4, 9, 10], Fish1: [0, 1, 2, 3], Fish3: [22], Fish2: [17] };
+const fishKey = (el) => el.id || (el.classList.contains("Fish2") ? "Fish2" : "");
+
+const pathsOf = (fish) => [...fish.children].filter((c) => c.tagName === "path");
+
+// Tail = small shapes whose centre sits in the rear fifth of the fish (opposite the head).
+const tailOf = (fish) => {
+  const fb = fish.getBBox();
+  const heading = headingOf(fish);
+  return pathsOf(fish).filter((p) => {
+    const b = p.getBBox();
+    if (b.width === 0 || b.width > fb.width * 0.3) return false;
+    const rel = (b.x + b.width / 2 - fb.x) / fb.width;
+    return (heading === 1 ? rel : 1 - rel) < TAIL_REAR_FRACTION;
+  });
+};
+
+// Rotate every part around one shared point; transformOrigin is relative to each part's own bbox.
+const pivotEach = (parts, px, py) =>
+  parts.forEach((p) => {
+    const b = p.getBBox();
+    gsap.set(p, { transformOrigin: `${px - b.x}px ${py - b.y}px` });
+  });
+
+const rigTail = (fish) => {
+  const tail = tailOf(fish);
+  if (!tail.length) return null;
+  const boxes = tail.map((p) => p.getBBox());
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const maxX = Math.max(...boxes.map((b) => b.x + b.width));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const maxY = Math.max(...boxes.map((b) => b.y + b.height));
+  // Pivot at the tail base: the edge that touches the body.
+  pivotEach(tail, headingOf(fish) === 1 ? maxX : minX, (minY + maxY) / 2);
+  const angle = isClownfish(fish) ? 10 : 14;
+  return gsap.fromTo(tail, { rotate: -angle }, { rotate: angle, duration: gsap.utils.random(0.28, 0.38), ease: "sine.inOut", repeat: -1, yoyo: true });
+};
+
+// Each fin flaps around the point of it closest to the body's centre (where it attaches).
+const rigFins = (fish) => {
+  const kids = [...fish.children];
+  const fb = fish.getBBox();
+  const cx = fb.x + fb.width / 2;
+  const cy = fb.y + fb.height / 2;
+  return (FIN_CHILD_INDEXES[fishKey(fish)] || [])
+    .map((i) => kids[i])
+    .filter(Boolean)
+    .map((fin, i) => {
+      const b = fin.getBBox();
+      pivotEach([fin], gsap.utils.clamp(b.x, b.x + b.width, cx), gsap.utils.clamp(b.y, b.y + b.height, cy));
+      return gsap.fromTo(fin, { rotate: -8 }, { rotate: 8, duration: gsap.utils.random(0.5, 0.7), ease: "sine.inOut", repeat: -1, yoyo: true, delay: i * 0.15 });
+    });
+};
+
+// Idle: tail wag + fin flap, a gentle bob, and a forward dart every few seconds (no squash or stretch).
 const swimIdle = (el) => {
   const heading = headingOf(el);
   const dart = isClownfish(el) ? 8 : 18;
   gsap.set(el, { transformOrigin: "50% 50%" });
   gsap.to(el, { y: gsap.utils.random(3, 6), duration: gsap.utils.random(1.4, 2), ease: "sine.inOut", repeat: -1, yoyo: true });
-  gsap.fromTo(el, { rotate: -2 }, { rotate: 2, duration: gsap.utils.random(0.9, 1.3), ease: "sine.inOut", repeat: -1, yoyo: true });
-  gsap.timeline({ repeat: -1, repeatDelay: gsap.utils.random(1.5, 3.5), delay: gsap.utils.random(0, 2.5) })
-    .to(el, { x: -heading * dart * 0.3, scaleX: 0.9, scaleY: 1.06, duration: 0.35, ease: "power2.out" })
-    .to(el, { x: heading * dart, scaleX: 1.04, scaleY: 0.97, duration: 0.3, ease: "power3.out" })
-    .to(el, { scaleX: 1, scaleY: 1, duration: 0.3, ease: "power1.out" }, "<0.2")
+  gsap.fromTo(el, { rotate: -1.5 }, { rotate: 1.5, duration: gsap.utils.random(1.2, 1.6), ease: "sine.inOut", repeat: -1, yoyo: true });
+  const tail = rigTail(el);
+  rigFins(el);
+  const darts = gsap.timeline({ repeat: -1, repeatDelay: gsap.utils.random(1.5, 3.5), delay: gsap.utils.random(0, 2.5) })
+    .to(el, { x: -heading * dart * 0.25, duration: 0.4, ease: "power2.out" })
+    // Beat the tail harder during the dart.
+    .add(() => tail && tail.timeScale(2.2))
+    .to(el, { x: heading * dart, duration: 0.35, ease: "power3.out" })
+    .add(() => tail && gsap.to(tail, { timeScale: 1, duration: 0.8 }))
     .to(el, { x: 0, duration: 2.2, ease: "sine.inOut" });
+  return { tail, darts };
 };
 
-// Leave: turn to face right, wind up, then burst off-screen with a quick body wiggle.
-const swimOut = (el, offscreenX, delay) => {
+// Leave: turn to face right, wind up, then burst off-screen with the tail beating fast.
+const swimOut = (el, offscreenX, delay, { tail, darts }) => {
+  darts.kill();
   const turn = headingOf(el) === -1;
   const tl = gsap.timeline({ delay });
   if (turn) tl.to(el, { scaleX: -1, duration: 0.25, ease: "power2.inOut" });
   const facing = turn ? -1 : 1;
-  tl.to(el, { x: `-=${12}`, scaleX: 0.85 * facing, scaleY: 1.1, rotate: 0, duration: 0.3, ease: "power2.out" })
-    .to(el, { x: `+=${offscreenX}`, scaleX: 1.05 * facing, scaleY: 0.95, duration: 1.1, ease: "power2.in" })
-    .fromTo(el, { rotate: -6 }, { rotate: 6, duration: 0.09, ease: "sine.inOut", repeat: 11, yoyo: true }, "<");
+  tl.to(el, { x: "-=12", scaleX: 0.9 * facing, rotate: 0, duration: 0.3, ease: "power2.out" })
+    .add(() => tail && tail.timeScale(3))
+    .to(el, { x: `+=${offscreenX}`, scaleX: facing, duration: 1.1, ease: "power2.in" });
   return tl;
 };
 
 const Symbiosis = ({ isLeaving = false, onSwimOut }) => {
   const svgRef = useRef(null);
+  const rigs = useRef(new Map());
 
   useEffect(() => {
     const fish = [...svgRef.current.querySelectorAll(SWIMMERS)];
     const tentacles = [...svgRef.current.querySelectorAll(TENTACLES)];
-    fish.forEach(swimIdle);
+    rigs.current = new Map(fish.map((el) => [el, swimIdle(el)]));
     swayTentacles(tentacles);
     return () => {
+      rigs.current.forEach(({ darts }) => darts.kill());
       gsap.killTweensOf(fish);
       gsap.killTweensOf(tentacles);
+      fish.forEach((el) => gsap.killTweensOf(pathsOf(el)));
     };
   }, []);
 
@@ -83,7 +147,7 @@ const Symbiosis = ({ isLeaving = false, onSwimOut }) => {
     const offscreenX = (el) => (window.innerWidth - el.getBoundingClientRect().left) / scale + 60;
 
     const tl = gsap.timeline({ onComplete: onSwimOut });
-    fish.forEach((el, i) => tl.add(swimOut(el, offscreenX(el), i * 0.08), 0));
+    fish.forEach((el, i) => tl.add(swimOut(el, offscreenX(el), i * 0.08, rigs.current.get(el)), 0));
     return () => tl.kill();
   }, [isLeaving, onSwimOut]);
 
