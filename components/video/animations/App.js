@@ -6,8 +6,11 @@ import gsap from "gsap";
 import CorrectAnswer from "@/components/animatedUI/correct-answer-2";
 import Symbiosis from "@/components/animatedUI/Symbiosis";
 
-const CORRECT_FEEDBACK_SECONDS = 8;
-const INCORRECT_FEEDBACK_SECONDS = 12;
+const AUTO_CONTINUE_SECONDS = 20;
+// Continue button geometry; the SVG stroke traces the button's rounded border.
+const CONTINUE_W = 192;
+const CONTINUE_H = 52;
+const CONTINUE_RADIUS = 6;
 
 class App extends Component {
   constructor(props) {
@@ -310,13 +313,27 @@ class App extends Component {
       playingInCorrectAudio: !isCorrect,
       points: this.state.points + (isCorrect ? this.state.pointsAdded : 0),
     }, this.animateFeedbackIn);
-    gsap.delayedCall(isCorrect ? CORRECT_FEEDBACK_SECONDS : INCORRECT_FEEDBACK_SECONDS, this.finishAnswer);
   };
   animateFeedbackIn = () => {
     gsap.fromTo("#correct, #incorrect", { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.8, delay: 0.15, ease: "power3.out" });
+    // The border fills clockwise; when the stroke closes the story resumes on its own.
+    const progress = document.querySelector("#continueProgress");
+    if (!progress) return;
+    const perimeter = progress.getTotalLength();
+    progress.setAttribute("stroke-dasharray", perimeter);
+    progress.setAttribute("stroke-dashoffset", perimeter);
+    progress.setAttribute("opacity", 1);
+    this.continueTween = gsap.fromTo(progress, { attr: { "stroke-dashoffset": perimeter } }, {
+      attr: { "stroke-dashoffset": 0 },
+      duration: AUTO_CONTINUE_SECONDS,
+      ease: "none",
+      onComplete: this.finishAnswer,
+    });
   };
   // Fade the overlay out first so the video is revealed smoothly instead of the overlay vanishing.
   finishAnswer = () => {
+    if (this.continueTween) this.continueTween.kill();
+    this.continueTween = null;
     gsap.to("#questionAnswer", { autoAlpha: 0, duration: 0.5, ease: "power2.in", onComplete: this.resetAnswer });
   };
   resetAnswer = () => {
@@ -329,22 +346,32 @@ class App extends Component {
       playing: true,
     });
   };
-  continueStory = (correct) => {
-    
-    gsap.killTweensOf(this.answerQuestion())
-    if (correct) {
-      gsap.to("#correct", { opacity: 0, duration: 1, delay: 1 })
-      gsap.set("#correct", { visibility: "hidden", delay: 1 })
-      gsap.delayedCall(1, this.handleToggleCorrectQuestion, [])
-    } else {
-      gsap.to("#incorrect", { opacity: 0, duration: 1, delay: 1 })
-      gsap.set("#incorrect", { visibility: "hidden", delay: 1 })
-      gsap.delayedCall(1, this.handleToggleCorrectQuestion, [])
-    }
-    this.handlePlayPause()
-    this.handleToggleAnswerTime()
-
-  };
+  componentWillUnmount() {
+    if (this.continueTween) this.continueTween.kill();
+  }
+  renderContinueButton = () => (
+    <button
+      type="button"
+      onClick={this.finishAnswer}
+      className="link relative block mx-auto mt-12 uppercase font-medium tracking-wide text-base md:text-xl"
+      style={{ width: CONTINUE_W, height: CONTINUE_H }}
+      aria-label={`Continue (continues automatically after ${AUTO_CONTINUE_SECONDS} seconds)`}
+    >
+      <svg
+        className="absolute inset-0 pointer-events-none"
+        width={CONTINUE_W}
+        height={CONTINUE_H}
+        viewBox={`0 0 ${CONTINUE_W} ${CONTINUE_H}`}
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect x="1" y="1" width={CONTINUE_W - 2} height={CONTINUE_H - 2} rx={CONTINUE_RADIUS} stroke="rgba(255,255,255,0.25)" strokeWidth="2" />
+        {/* A rect's path starts top-left and runs clockwise; the dash is sized to its perimeter in animateFeedbackIn. */}
+        <rect id="continueProgress" x="1" y="1" width={CONTINUE_W - 2} height={CONTINUE_H - 2} rx={CONTINUE_RADIUS} stroke="white" strokeWidth="2" opacity="0" />
+      </svg>
+      Continue
+    </button>
+  );
   ref = (player) => {
     this.player = player;
   };
@@ -464,17 +491,7 @@ class App extends Component {
                 {questionTitle}
                 </h2>
                 <p className="text-white m-auto max-w-lg mt-9">{qFeedback}</p>
-                <a
-                  rel="noreferrer"
-                  className="link"
-                >
-                  {/* <button
-                    className="py-2 px-7 mt-20 font-medium border-2 uppercase border-white bg-white rounded-md text-base text-black
-                  md:text-xl tracking-wide duration-300 z-50 link"
-                  onClick={() => this.continueStory(true)}>
-                    Continue
-                  </button> */}
-                </a>
+                {this.renderContinueButton()}
               </div>
             </div> 
             }
@@ -489,12 +506,7 @@ class App extends Component {
                   {questionTitle}
                 </h2>
                 <p className="text-white max-w-lg mt-9">{qFeedback}</p>
-                {/* <button
-                    className="py-2 mt-20 px-7 font-medium border-2 uppercase border-white bg-white rounded-md text-base text-black
-                  md:text-xl tracking-wide duration-300 z-50 link"
-                  onClick={() => this.continueStory(false)}>
-                    Continue
-                  </button> */}
+                {this.renderContinueButton()}
               </div>
             </div>
             }
